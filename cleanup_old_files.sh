@@ -1,14 +1,14 @@
 #!/bin/bash
 # 보관 기간(기본 30일)이 지난 로그/데이터 파일 삭제
-# - 인스턴스 시작 시 : run_pipeline.sh 에서 호출
-# - 인스턴스 중지 시 : systemd crawl-cleanup.service 의 ExecStop 에서 호출
+# - run_pipeline.sh 실행 시작 시 자동 호출
+# - 보관 기간 변경: RETENTION_DAYS=60 ./cleanup_old_files.sh
 #
 # 사용법: ./cleanup_old_files.sh [--dry-run]
 #   --dry-run : 삭제하지 않고 대상만 출력
 #
-# ※ integrated / result 는 S3에 업로드되지만 raw 와 logs 는 S3에 백업되지 않으므로 삭제 시 복구 불가
+# ※ 로컬 파일만 존재하므로 삭제 시 복구 불가 (보관이 필요한 결과는 별도 위치로 복사)
 
-BASE_DIR=$(dirname "$(readlink -f "$0")")
+BASE_DIR=$(cd "$(dirname "$0")" && pwd)
 RETENTION_DAYS=${RETENTION_DAYS:-30}
 TARGET_DIRS=(logs raw integrated result)
 

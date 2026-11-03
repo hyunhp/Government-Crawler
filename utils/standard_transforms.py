@@ -5,7 +5,6 @@ import hashlib
 import argparse
 import time
 import pandas as pd
-import boto3
 from datetime import datetime, date
 
 today = date.today().strftime('%Y-%m-%d')
@@ -28,33 +27,6 @@ MAPPING_CONFIG = {
     'smes': { 'ancm_title': 'pblancNm', 'org_name': 'sportInsttNm', 'post_date': 'creatDt', 'start_date': 'pblancBgnDt', 'end_date': 'pblancEndDt', 'detail_url': 'pblancDtlUrl'},
     'smtech': { 'ancm_title': 'title', 'org_name': 'project_name', 'post_date': 'post_date', 'detail_url': 'detail_url'}
 }
-
-# -------------------------------------------------
-# 0. S3 업로드 함수 (연도/월 파티셔닝)
-# -------------------------------------------------
-def upload_to_s3_partitioned(file_path, bucket_name, prefix, target_date):
-    """
-    S3에 연도/월 폴더 구조로 파일 업로드
-    구조: bucket_name/prefix/YYYY/MM/filename
-    """
-    s3 = boto3.client('s3')
-    
-    # 날짜에서 연도와 월 추출 (target_date: YYYY-MM-DD)
-    date_parts = target_date.split('-')
-    year = date_parts[0]
-    month = date_parts[1]
-    
-    # 파일명만 추출
-    file_name = os.path.basename(file_path)
-    
-    # S3 경로(Key) 생성
-    s3_key = f"{prefix}/{year}/{month}/{file_name}"
-    
-    try:
-        s3.upload_file(file_path, bucket_name, s3_key)
-        print(f"🚀 S3 업로드 성공: s3://{bucket_name}/{s3_key}")
-    except Exception as e:
-        print(f"❌ S3 업로드 실패: {e}")
 
 def generate_hash_id(platform, title, date):
     if pd.isna(title) or pd.isna(date): 
@@ -190,6 +162,7 @@ def transform_all_raw_data(target_date, target_keyword, raw_dir='../raw', output
             if not os.path.exists(output_dir): os.makedirs(output_dir)
             integrated_file = f"{output_dir}/integrated_{target_date}_{today}.csv"
             final_df.to_csv(integrated_file, index=False, encoding='utf-8-sig')
+            print(f"💾 통합 파일 저장: {integrated_file}")
 
             # 2. 로컬 키워드(양자) 추출 파일 저장
             if not os.path.exists(result_dir): os.makedirs(result_dir)
@@ -200,19 +173,6 @@ def transform_all_raw_data(target_date, target_keyword, raw_dir='../raw', output
             print(f"🎯 키워드 '{target_keyword}' 추출: {len(keyword_df)}건 -> {keyword_file}")
             for platform, cnt in keyword_df['src_platform'].value_counts().items():
                 print(f"   - {platform:<10} {cnt:>6}건")
-
-            # -------------------------------------------------
-            # 3. S3로 전송 
-            # Shell 실행 날짜로 폴더 저장됨
-            # -------------------------------------------------
-            MY_BUCKET = "government-crawled-bucket"
-            
-            # 전체 통합본 업로드
-            upload_to_s3_partitioned(integrated_file, MY_BUCKET, "integrated", target_date=today)
-            
-            # 양자 추출본 업로드
-            if not keyword_df.empty:
-                upload_to_s3_partitioned(keyword_file, MY_BUCKET, "result", target_date=today)
 
     else:
         print(f"❌ {target_date} 데이터 처리 실패.")
